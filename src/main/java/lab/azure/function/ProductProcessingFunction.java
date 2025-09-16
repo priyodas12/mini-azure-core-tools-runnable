@@ -29,6 +29,7 @@ public class ProductProcessingFunction {
 	String user = System.getenv("DB_USER");
 	String password = System.getenv("DB_PASSWORD");
 	String productApiUrl = System.getenv("PRODUCT_API_URL");
+	ObjectMapper mapper = new ObjectMapper();
 
 	@FunctionName("timerFunction")
 	public void run(
@@ -48,7 +49,7 @@ public class ProductProcessingFunction {
 		}
 
 		context.getLogger().info(
-				"[" + invocationId + " : timerFunction ] completed - "
+				"\n[" + invocationId + " : timerFunction ] completed - "
 						+ DateTimeFormatter.ISO_INSTANT.format(Instant.now())
 						+ "\n");
 	}
@@ -65,7 +66,7 @@ public class ProductProcessingFunction {
 					.build();
 
 			HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-			context.getLogger().info("\nProduct API Response: \n" + response.body());
+			context.getLogger().info("\nProduct API Response: \n\n" + response.body());
 			return response.body();
 		} catch (Exception e) {
 			context.getLogger().severe("\nError calling Product API: " + e.getMessage());
@@ -77,6 +78,22 @@ public class ProductProcessingFunction {
 		return null;
 	}
 
+	private ProductInvoice mapToProductInvoice(String productApiResponse, ExecutionContext context) {
+		context.getLogger().info(
+				"\n[ mapToProductInvoice ] started - " + DateTimeFormatter.ISO_INSTANT.format(
+						Instant.now()));
+		try {
+			ProductResponse productResponse = mapper.readValue(productApiResponse, ProductResponse.class);
+			return productResponse.getProduct();
+		} catch (JsonProcessingException e) {
+			context.getLogger().severe("\nError while mapping productInvoice: " + e.getMessage());
+		} finally {
+			context.getLogger().info(
+					"\n[ mapToProductInvoice ] completed - " + DateTimeFormatter.ISO_INSTANT.format(
+							Instant.now()));
+		}
+		return null;
+	}
 
 	private void saveProductInvoice(ExecutionContext context, ProductInvoice productInvoice) {
 
@@ -95,7 +112,7 @@ public class ProductProcessingFunction {
 			stmt.setBigDecimal(5, productInvoice.getProductPrice());
 
 			stmt.execute();
-			System.out.println(
+			context.getLogger().info(
 					"\nProductInvoice saved successfully.ProductId: " + productInvoice.getId());
 
 		} catch (SQLException e) {
@@ -113,14 +130,5 @@ public class ProductProcessingFunction {
 		return String.valueOf(randomNum);
 	}
 
-	private ProductInvoice mapToProductInvoice(String productApiResponse, ExecutionContext context) {
-		ObjectMapper mapper = new ObjectMapper();
-		try {
-			ProductResponse productResponse = mapper.readValue(productApiResponse, ProductResponse.class);
-			return productResponse.getProduct();
-		} catch (JsonProcessingException e) {
-			context.getLogger().severe("\nError while mapping productInvoice: " + e.getMessage());
-		}
-		return null;
-	}
+
 }
